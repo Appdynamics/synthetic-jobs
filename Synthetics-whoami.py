@@ -2,7 +2,8 @@ import requests
 import pysftp
 import os 
 
-# settings for retrieving certificate files
+# settings for retrieving certificate files from an sftp server
+# can also use credential vault if the key is small than 5000 characters
 cert_host = 'ec2-18-220-163-145.us-east-2.compute.amazonaws.com'
 user_name = '<%CharlesLin-AWS-SFTP-User%>'
 user_secret = "<%CharlesLin-AWS-SFTP-Secret%>"
