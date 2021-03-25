@@ -16,6 +16,8 @@ print(os.path.dirname(os.path.realpath(__file__)))
 cnopts = pysftp.CnOpts()
 cnopts.hostkeys = None
 
+# retrieve certs from sftp server
+# can also use credential vault if the key is small than 5000 characters
 with pysftp.Connection(cert_host, username=user_name, password=user_secret, cnopts=cnopts) as sftp:
     # Fetch the certificate files
     sftp.get('client.crt') 
