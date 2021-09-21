@@ -147,11 +147,10 @@ const assert = require("assert");
 
 #### Encryption
 You might need to encrypt/decrypt payloads, create digital signatures, verify integrity of data, etc as part of your API Monitoring tests. We've a couple of libraries included for the encryption needs.
-jose - provides support for Universal "JSON Web Almost Everything" - JWA, JWS, JWE, JWT, JWK.
-- xml-crypto: An XML digital signature library.
-- xmldom - DOM parser to be used along with xml-crypto for verifying XML Documents.
-- node-forge: A native implementation of TLS (and various other cryptographic tools) in JavaScript. Has useful functions like decrypting an RSA Private key with a passphrase.
-- crypto - The Node.js's crypto module provides cryptographic functionality that includes a set of wrappers for OpenSSL's hash, HMAC, cipher, decipher, sign, and verify functions.
+- [jose](https://github.com/panva/jose) - provides support for Universal "JSON Web Almost Everything" - JWA, JWS, JWE, JWT, JWK.
+- [xml-crypto](https://github.com/yaronn/xml-crypto) - An XML digital signature library.
+- [xmldom](https://github.com/xmldom/xmldom) - DOM parser to be used along with xml-crypto for verifying XML Documents.
+- [crypto](https://nodejs.org/api/crypto.html) - The Node.js's crypto module provides cryptographic functionality that includes a set of wrappers for OpenSSL's hash, HMAC, cipher, decipher, sign, and verify functions.
 ##### Example usage:
 
 ##### JWE Encryption & Decryption
@@ -193,26 +192,36 @@ jose - provides support for Universal "JSON Web Almost Everything" - JWA, JWS, J
 ```javascript
 (async () => {
     const select = require('xml-crypto').xpath,
-        dom = require('xmldom').DOMParser,
+        dom = require('@xmldom/xmldom').DOMParser,
         SignedXml = require('xml-crypto').SignedXml,
         FileKeyInfo = require('xml-crypto').FileKeyInfo,
-        fs = require('fs')
-    const forge = require('node-forge')
-  
+        fs = require('fs'),
+        crypto = require('crypto')
+ 
     cert_str = "-----BEGIN CERTIFICATE-----<REDACTED>-----END CERTIFICATE-----\n"
     key_str = "-----BEGIN RSA PRIVATE KEY-----<REDACTED>-----END RSA PRIVATE KEY-----\n"
     auth_data_to_sign = '<?xml version="1.0" encoding="UTF-8"?><oAuthToken xmlns="http://com.citi.citiconnect/services/types/oauthtoken/v1"><grantType>client_credentials</grantType><scope>/authenticationservices/v1</scope><sourceApplication>CCF</sourceApplication></oAuthToken>'
     keyPassphrase="<REDACTED>"
-  
+ 
     /*
-     * xml-crypto cannot directly deal with private keys encrypted with a passphrase.
-     * For that, we'll first need to decrypt the private key using node-forge and then pass the
-     * decrypted key to xml-crypto
+     * xml-crypto cannot directly deal with private keys that are encrypted with a passphrase.
+     * For that, we'll first need to decrypt the private key and then pass the
+     * decrypted key to xml-crypto for signing the XML document
      */
-    const decryptedKey = forge.pki.decryptRsaPrivateKey((key_str).toString('ascii'), keyPassphrase);
-    const decryptedKeyBuffer = Buffer.from(forge.pki.privateKeyToPem(decryptedKey));
-  
-    const sig = new SignedXml();
+    const encryptedKey = crypto.createPrivateKey({
+        key: key_str,
+        passphrase: keyPassphrase
+    })
+ 
+    const decryptedKey = encryptedKey.export({
+        format: 'pem',
+        type: 'pkcs1',
+    })
+ 
+    const decryptedKeyBuffer = Buffer.from(decryptedKey)
+ 
+    // Computing the signature
+    const sig = new SignedXml()
     sig.addReference(
         // reference to the root node
         "/*",
@@ -228,31 +237,32 @@ jose - provides support for Universal "JSON Web Almost Everything" - JWA, JWS, J
         // this is the signal that the signature is affecting the whole xml document
         true
     );
-  
+ 
     /*
      * For a list of supported Signature Algorithms, Hashing Algorithms, Canonicalization and Transformation Algorithms
-     * go through the documentation of xml-crypto on GitHub
+     * go through the documentation of xml-crypto on GitHub here: https://github.com/yaronn/xml-crypto
      */
-    sig.signingKey = decryptedKeyBuffer;
-    sig.canonicalizationAlgorithm = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
-    sig.computeSignature(auth_data_to_sign);
+    sig.signingKey = decryptedKeyBuffer
+    sig.canonicalizationAlgorithm = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315'
+    sig.computeSignature(auth_data_to_sign)
+ 
+    // Write the signed xml to a file named 'signed.xml'
     fs.writeFileSync("signed.xml", sig.getSignedXml());
-  
+ 
+    // Verifying the XML signature of the file 'signed.xml'
     (() => {
-        const xml = fs.readFileSync("signed.xml").toString();
+        const xml = fs.readFileSync("signed.xml").toString()
+        const doc = new dom().parseFromString(xml)
  
- 
-        // We need xmldom library to parse the XML DOM and get the signature
-        const doc = new dom().parseFromString(xml);
-        const signature = select(doc, "//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']")[0];
-        const sig = new SignedXml();
-        fs.writeFileSync("client_public.pem", cert_str);
-        sig.keyInfoProvider = new FileKeyInfo("client_public.pem");
-        sig.loadSignature(signature);
-        const res = sig.checkSignature(xml);
-        if (!res) console.log(sig.validationErrors);
+        const signature = select(doc, "//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']")[0]
+        const sig = new SignedXml()
+        fs.writeFileSync("client_public.pem", cert_str)
+        sig.keyInfoProvider = new FileKeyInfo("client_public.pem")
+        sig.loadSignature(signature)
+        const res = sig.checkSignature(xml)
+        if (!res) console.log(sig.validationErrors)
     })()
-  
+ 
 })()
 ```
 
