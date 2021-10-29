@@ -1,3 +1,3 @@
 # synthetic-jobs
 
-This folder contains examples of AppDynamics Synthetics Jobs
+This folder contains examples of AppDynamics Synthetics Jobs..
