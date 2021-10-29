@@ -12,7 +12,7 @@
 
     // Fetch headers.
     var headers = {
-        'Authorization': 'Bearer 96923d63f06237f411f84986e39cdf433820168c6ec02c7827e792c27ce0ec77'
+        // 'Authorization': Use Bearer token here
     };
     let response = await client.head('https://gorest.co.in/public-api/users');
     assert.equal(response.headers['content-encoding'], 'gzip');
